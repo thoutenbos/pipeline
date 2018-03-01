@@ -8,6 +8,8 @@ cd "[% dirs.tmp %]"
 
 assert_not_empty "[% sample_bam_path %]"
 
+[%- IF opt.REALIGNMENT_SCATTER > 0 -%]
+
 java -Xmx[% opt.REALIGNMENT_MASTER_MEM %]G \
     -Djava.io.tmpdir="[% dirs.tmp %]" \
     -jar "[% opt.QUEUE_PATH %]/Queue.jar" \
@@ -22,6 +24,29 @@ java -Xmx[% opt.REALIGNMENT_MASTER_MEM %]G \
     -nsc [% opt.REALIGNMENT_SCATTER %] \
     [% known_files %] \
     -run
+
+[%- ELSE -%]
+
+java -Xmx[% opt.REALIGNMENT_MASTER_MEM %]G \
+    -Djava.io.tmpdir="[% dirs.tmp %]" \
+    -jar "[% opt.QUEUE_PATH %]/GenomeAnalysisTK.jar" \
+    -T RealignerTargetCreator \
+    -nt [% opt.REALIGNMENT_MASTER_THREADS %] \
+    -R "[% opt.GENOME %]" \
+    -I "[% sample_bam_path %]" \
+    [% known_files %] \
+    -o "[% sample_bam_path.split('/').last.replace('bam', 'target.intervals.list') %]"
+
+java -Xmx[% opt.REALIGNMENT_MASTER_MEM %]G \
+    -Djava.io.tmpdir="[% dirs.tmp %]" \
+    -jar "[% opt.QUEUE_PATH %]/GenomeAnalysisTK.jar" \
+    -T IndelRealigner \
+    -R "[% opt.GENOME %]" \
+    -I "[% sample_bam_path %]" \
+    -targetIntervals "[% sample_bam_path.split('/').last.replace('bam', 'target.intervals.list') %]" \
+    -o "[% sample_bam_path.split('/').last.replace('bam', 'realigned.bam') %]"
+
+[%- END -%]
 
 # do not touch done file; this job shares name/step with the master done file. it is touched by markDone.
 success_no_done
